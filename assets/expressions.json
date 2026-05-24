@@ -1,7 +1,7 @@
 [
   {
     "type": "LITERAL",
-    "from_tokens": ["NUMBER", "STRING", "BOOLEAN", "NULL"]
+    "from_tokens": ["NUMBER", "NEWLINE", "STRING" , "BOOLEAN", "NULL"]
   },
 
   {

@@ -22,19 +22,27 @@ const literals = helpers.expressions.filter(
             }
         }
     ).map(expression_ref=>expression_ref.from_tokens.map(ft=>ft.toLowerCase()))[0]
+const groups = helpers.expressions.filter(
+    expression_ref=>{
+        if(expression_ref.hasOwnProperty('start') && expression_ref.hasOwnProperty('end'))
+        {
+            return (expression_ref)
+        }
+    }
+)
 function process_token(token_list,pos){
     const previous_pos      = pos-1
     const next_pos          = pos+1
     const token             = token_list.length>pos ? token_list[pos] : null
     const previous          = token_list.length>previous_pos ? token_list[previous_pos] : null
-    const next              = token_list.length>next_pos ? token_list[next_pos] : null
-    
+    const next              = token_list.length>next_pos ? token_list[next_pos] : null    
     const [type,value]      =   token
     const is_operator       =   helpers.operators.hasOwnProperty(value)
     const operator          =   is_operator ? helpers.operators[value] : null
-    
-    
     const is_litteral       =   literals.includes(type)
+    console.info(groups,value)
+    const is_group          =   groups.find(group=>group.start===value)
+    console.info('is_group => ',is_group)
     if(is_operator){
         const   matching_expressions    = helpers.expressions.filter(expression_ref=>expression_ref.hasOwnProperty('operators') && expression_ref.operators.includes(value))
         let     matched                 = null
@@ -45,10 +53,9 @@ function process_token(token_list,pos){
                 {
                     if(expression_ref.associativity == 'left')
                     {
-                        expression_ref.left = previous
                         if(previous_pos>=0)
                         {
-                            matched = expression_ref
+                            matched = {...expression_ref,left:previous,idx:previous_pos,operator,value}
                         }
                     }
                 }
@@ -60,16 +67,52 @@ function process_token(token_list,pos){
     {
         if(is_litteral)
         {
-            token[2]                 = literal_expression
+            token[2]                 = {...literal_expression,idx:pos,value,operator}
         }
     }
     pos++
-    return {token,pos}
+    return {token,pos,operator,value}
 }
-
+function ast_parse(dataset)
+{
+    const ast                   = []
+    let current_pos             = 0
+    const token_set_size        = dataset.length
+    while(current_pos < token_set_size)
+    {
+        const current_token         = dataset[current_pos]
+        const {token,pos,operator}           = current_token
+        if(token.length <2)
+        {
+            console.info(' incorrect token configuration ',token)
+            break
+        }
+        const params                = token.length > 1 ? token[2] : {}
+        const type                  = params ? params.type : ''
+        if(type.toLowerCase() != 'literal')
+        {
+            if(params.type == 'BINARY_EXPRESSION')   
+            {
+                let left    = params.left 
+                let right   = (dataset.length > current_pos+1) ? dataset[current_pos+1].token : null
+                const node = {
+                    type:params.type,
+                    operator:params.operator,
+                    value:params.value,
+                    left,
+                    right
+                }
+                ast.push(node)
+            }
+        }
+        current_pos++
+    }
+    return ast
+}
+const clean_token   =   [] 
 if(args.length)
 {
-    const dataset = {}
+    const dataset       =   {}
     args.map(file=>{
         file_data = fs.readFileSync(file).toString()
         file_tokens = []
@@ -79,6 +122,7 @@ if(args.length)
         }
         dataset[file] = {file_data,file_tokens}
     })
+    console.info(dataset['math.mb'].file_tokens)
     Object.keys(dataset).map(
         set_name=>{
             const set = dataset[set_name]
@@ -89,12 +133,12 @@ if(args.length)
                 {
                     const {token,pos} = process_token(set.file_tokens,idx)
                     idx = pos
-                    console.info(token,pos)
+                    clean_token.push({token,pos})
                 }
             }
         }
     )
-    // console.info(dataset['code.mb'])
 }
-
-// console.info(lexer.tokenize('let var_a'))
+console.info(clean_token)
+const ast_tree = ast_parse(clean_token)
+console.info(ast_tree)
