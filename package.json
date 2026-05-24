@@ -17,9 +17,12 @@
     "interpreter"
   ],
   "author": "El Hadji Seybatou Mbengue (Tek-Tech)",
-  "license": "ISC",
+  "license": "UNLICENSED",
   "bugs": {
     "url": "https://github.com/dev0ps221/parseit/issues"
   },
-  "homepage": "https://github.com/dev0ps221/parseit#readme"
+  "homepage": "https://github.com/dev0ps221/parseit#readme",
+  "dependencies": {
+    "lexitjs": "^1.0.7"
+  }
 }

@@ -1,0 +1,33 @@
+[
+  {
+    "type": "LITERAL",
+    "from_tokens": ["NUMBER", "STRING", "BOOLEAN", "NULL"]
+  },
+
+  {
+    "type": "IDENTIFIER",
+    "token": "identifier"
+  },
+
+  {
+    "type": "GROUP",
+    "start": "(",
+    "end": ")",
+    "inner": "EXPRESSION"
+  },
+
+  {
+    "type": "BINARY_EXPRESSION",
+    "operators": ["+", "-", "*", "/", "==", "!=", ">", "<", ">=", "<="],
+    "associativity": "left"
+  },
+
+  {
+    "type": "CALL_EXPRESSION",
+    "args": {
+      "start": "(",
+      "end": ")",
+      "delimiter": ","
+    }
+  }
+]
