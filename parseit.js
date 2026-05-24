@@ -60,7 +60,6 @@ function process_token(token_list,pos){
     {
         if(is_litteral)
         {
-            literal_expression.value = value
             token[2]                 = literal_expression
         }
     }
