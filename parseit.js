@@ -40,9 +40,9 @@ function process_token(token_list,pos){
     const is_operator       =   helpers.operators.hasOwnProperty(value)
     const operator          =   is_operator ? helpers.operators[value] : null
     const is_litteral       =   literals.includes(type)
-    console.info(groups,value)
+    // console.info(groups,value)
     const is_group          =   groups.find(group=>group.start===value)
-    console.info('is_group => ',is_group)
+    // console.info('is_group => ',is_group,groups,value)
     if(is_operator){
         const   matching_expressions    = helpers.expressions.filter(expression_ref=>expression_ref.hasOwnProperty('operators') && expression_ref.operators.includes(value))
         let     matched                 = null
@@ -69,6 +69,46 @@ function process_token(token_list,pos){
         {
             token[2]                 = {...literal_expression,idx:pos,value,operator}
         }
+        if(is_group)
+        {
+            let current_group = is_group
+            let cursor      =   pos + 1
+            let token_set   =   []    
+            let test_token              = token_list[cursor]
+            let type                    = test_token[0]
+            let test_token_value        = test_token[1]
+            let token_count =   0 
+            let matched_end =   (test_token == current_group.end)
+            while((token_list.length > cursor) && (test_token_value != current_group.end))
+            {
+                console.info(test_token_value,current_group.end)
+                token_set.push(test_token)
+                cursor++
+                if(token_list.length>cursor)
+                {
+                    test_token              = token_list[cursor]
+                    type                    = test_token[0]
+                    test_token_value        = test_token[1]
+                }
+                else
+                {
+                    break   
+                }
+                if(test_token == current_group.end)
+                {
+                    matched_end = true
+                }
+            }
+            let tokens = []
+            token_set.forEach((token_ref,idx)=>{
+                const {token,pos} = process_token(token_set,idx)
+                idx = pos
+                tokens.push({token,pos})
+            })
+            // console.info(ast_parse(tokens))
+            token[2] = {...current_group,elements:ast_parse(tokens)}
+            pos+=token_set.length
+        }
     }
     pos++
     return {token,pos,operator,value}
@@ -91,12 +131,12 @@ function ast_parse(dataset)
         const type                  = params ? params.type : ''
         if(type.toLowerCase() != 'literal')
         {
-            if(params.type == 'BINARY_EXPRESSION')   
+            if(type == 'BINARY_EXPRESSION')   
             {
                 let left    = params.left 
                 let right   = (dataset.length > current_pos+1) ? dataset[current_pos+1].token : null
                 const node = {
-                    type:params.type,
+                    type,
                     operator:params.operator,
                     value:params.value,
                     left,
@@ -122,7 +162,7 @@ if(args.length)
         }
         dataset[file] = {file_data,file_tokens}
     })
-    console.info(dataset['math.mb'].file_tokens)
+    // console.info(dataset['math.mb'].file_tokens)
     Object.keys(dataset).map(
         set_name=>{
             const set = dataset[set_name]
@@ -139,6 +179,7 @@ if(args.length)
         }
     )
 }
-console.info(clean_token)
+
 const ast_tree = ast_parse(clean_token)
 console.info(ast_tree)
+// console.info(JSON.stringify(ast_tree))

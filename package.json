@@ -23,6 +23,6 @@
   },
   "homepage": "https://github.com/dev0ps221/parseit#readme",
   "dependencies": {
-    "lexitjs": "^1.0.7"
+    "lexitjs": "^2.0.0"
   }
 }
