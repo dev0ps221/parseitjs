@@ -5,7 +5,6 @@ const { fs,helpers } = require('./utils')
 const lexer = new lexit.LexIt()
 const args  = process.argv
 const name  = __filename 
-// console.info('read helpers')
 const literal_expression = helpers.expressions.filter(
         expression_ref=>{
             if(expression_ref.type.toLowerCase('literal'))
@@ -40,9 +39,7 @@ function process_token(token_list,pos){
     const is_operator       =   helpers.operators.hasOwnProperty(value)
     const operator          =   is_operator ? helpers.operators[value] : null
     const is_litteral       =   literals.includes(type)
-    // console.info(groups,value)
     const is_group          =   groups.find(group=>group.start===value)
-    // console.info('is_group => ',is_group,groups,value)
     if(is_operator){
         const   matching_expressions    = helpers.expressions.filter(expression_ref=>expression_ref.hasOwnProperty('operators') && expression_ref.operators.includes(value))
         let     matched                 = null
@@ -55,7 +52,7 @@ function process_token(token_list,pos){
                     {
                         if(previous_pos>=0)
                         {
-                            matched = {...expression_ref,left:previous,idx:previous_pos,operator,value}
+                            matched = {...expression_ref,left:previous[2],idx:previous_pos,operator,value}
                         }
                     }
                 }
@@ -81,7 +78,6 @@ function process_token(token_list,pos){
             let matched_end =   (test_token == current_group.end)
             while((token_list.length > cursor) && (test_token_value != current_group.end))
             {
-                console.info(test_token_value,current_group.end)
                 token_set.push(test_token)
                 cursor++
                 if(token_list.length>cursor)
@@ -105,7 +101,6 @@ function process_token(token_list,pos){
                 idx = pos
                 tokens.push({token,pos})
             })
-            // console.info(ast_parse(tokens))
             token[2] = {...current_group,elements:ast_parse(tokens)}
             pos+=token_set.length
         }
@@ -134,12 +129,13 @@ function ast_parse(dataset)
             if(type == 'BINARY_EXPRESSION')   
             {
                 let left    = params.left 
-                let right   = (dataset.length > current_pos+1) ? dataset[current_pos+1].token : null
+                let right   = (dataset.length > current_pos+1) ? dataset[current_pos+1].token[2] : null
                 const node = {
                     type,
                     operator:params.operator,
                     value:params.value,
                     left,
+                    idx:current_pos,
                     right
                 }
                 ast.push(node)
@@ -147,7 +143,7 @@ function ast_parse(dataset)
         }
         current_pos++
     }
-    return ast
+    return clean_ast(ast)
 }
 const clean_token   =   [] 
 if(args.length)
@@ -162,7 +158,6 @@ if(args.length)
         }
         dataset[file] = {file_data,file_tokens}
     })
-    // console.info(dataset['math.mb'].file_tokens)
     Object.keys(dataset).map(
         set_name=>{
             const set = dataset[set_name]
@@ -179,7 +174,59 @@ if(args.length)
         }
     )
 }
-
+function merge_nodes(node,previous_node,next_node,current_pos,previous_pos,next_pos,raw_ast)
+{
+    if(next_node.type == "LITERAL" && (next_node.idx == node.right.idx) )
+    {
+        node.right = next_node
+        previous_pos++
+        current_pos++
+        next_pos++
+    }
+    else if(next_node.type == "BINARY_EXPRESSION" && (next_node.left.idx == node.right.idx) )
+    {
+        node.right = next_node
+        while(next_pos+1 < raw_ast.length)
+        {
+            previous_pos++
+            current_pos++
+            next_pos++
+            node              = (raw_ast.length > current_pos)    ? raw_ast[current_pos]  : null
+            previous_node     = (raw_ast.length > previous_pos)   ? raw_ast[previous_pos] : null
+            next_node         = (raw_ast.length > next_pos)       ? raw_ast[next_pos]     : null
+            var {node,previous_node,next_node,current_pos,previous_pos,next_pos} = merge_nodes(node,previous_node,next_node,current_pos,previous_pos,next_pos,raw_ast)
+            node.right = next_node
+        }
+        previous_pos++
+        current_pos++
+        next_pos++
+    }
+    return {node,previous_node,next_node,current_pos,previous_pos,next_pos}
+}
+function clean_ast(raw_ast)
+{
+    const   ast             = []
+    var     current_pos     = 0
+    var     previous_pos    = current_pos-1
+    var     next_pos        = current_pos+1
+    while (current_pos < raw_ast.length)
+    {
+        var node              = (raw_ast.length > current_pos)    ? raw_ast[current_pos]  : null
+        var previous_node     = (raw_ast.length > previous_pos)   ? raw_ast[previous_pos] : null
+        var next_node         = (raw_ast.length > next_pos)       ? raw_ast[next_pos]     : null
+        if(node.type == "BINARY_EXPRESSION")
+        {
+            if(next_node)
+            {
+                var {node,previous_node,next_node,current_pos,previous_pos,next_pos} = merge_nodes(node,previous_node,next_node,current_pos,previous_pos,next_pos,raw_ast)
+            }
+        }
+        ast.push(node)
+        previous_pos++
+        current_pos++
+        next_pos++
+    }
+    return ast
+}
 const ast_tree = ast_parse(clean_token)
 console.info(ast_tree)
-// console.info(JSON.stringify(ast_tree))
