@@ -234,95 +234,94 @@ function binary_factor(ast)
         const   next            = next_idx                  ? ast[next_idx]         : null
         let     append          = false 
         const   ignore          = leaf.ignore || leaf.type!= 'BINARY_EXPRESSION'
-        if(!ignore)
+        
+        if(previous)
         {
-            if(previous)
+            if(previous.type == 'BINARY_EXPRESSION')
             {
-                if(previous.type == 'BINARY_EXPRESSION')
+                if(leaf.type == 'BINARY_EXPRESSION')
                 {
-                    if(leaf.type == 'BINARY_EXPRESSION')
+                    if((previous.right))
                     {
-                        if((previous.right))
+                        if(leaf.left && ((previous.right.idx == leaf.left.idx) || (previous.right.idx == leaf.idx) ))
                         {
-                            if(leaf.left && ((previous.right.idx == leaf.left.idx) || (previous.right.idx == leaf.idx) ))
-                            {
-                                if(operators_predececense[leaf.operator_sign] < operators_predececense[previous.operator_sign])
-                                {
-                                    if(previous_leaf_idx)
-                                    {
-                                        clean_ast[previous_leaf_idx].right = leaf
-                                    }
-                                    append                              = false
-                                }
-                            }
-                            else   
-                            {   
-                                if(previous_leaf_idx)
-                                {
-                                    clean_ast[previous_leaf_idx]        =   clean_ast[previous_leaf_idx]
-                                    append                              = false
-                                }
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    if(previous_leaf_idx)
-                    {
-                        leaf.left                           =   clean_ast[previous_leaf_idx]
-                        clean_ast[previous_leaf_idx].right  =   leaf
-                        append = true
-                    }
-                }
-            }
-            if(next)
-            {
 
-                if(next.type == 'BINARY_EXPRESSION')
-                {
-                    if(leaf.type == 'BINARY_EXPRESSION')
-                    {
-                        if((next.left))
-                        {
-                            if(leaf.right && ((next.left.idx == leaf.right.idx) || (next.left.idx == leaf.idx) ))
+                            if((operators_predececense[leaf.operator_sign] == operators_predececense[next.operator_sign]))
                             {
-                                if(operators_predececense[leaf.operator_sign] < operators_predececense[next.operator_sign])
-                                {
-                                    ast[next_idx].left            = leaf
-                                    if(next_leaf_idx)
-                                    {
-                                        clean_ast[next_leaf_idx].left = leaf
-                                    }
-                                    leaf.ignore     = true
-                                }
-                                else
-                                {
-                                    leaf.right = next
-                                    ast[next_idx].ignore            = true
-                                    if(next_leaf_idx)
-                                    {
-                                        clean_ast[next_leaf_idx].ignore = true
-                                    }
-                                    append = true
-                                }
+                                ast[previous_idx].right = leaf
+                                leaf                    = ast[previous_idx]
+                                append                  = false
+                            }
+                            else
+                            {
+                                leaf.left                    = ast[previous_idx] 
+                                ast[previous_idx].ignore          = true
+                                append = true
+                                
+                            }
+                        }
+                        else   
+                        {   
+                            if(previous_leaf_idx)
+                            {
+                                clean_ast[previous_leaf_idx]        =   leaf
+                                append                              = false
                             }
                         }
                     }
                 }
-                else
+            }
+            else
+            {
+                if(previous_leaf_idx)
                 {
-                    if(next_leaf_idx)
+                    leaf.left                           =   clean_ast[previous_leaf_idx]
+                    clean_ast[previous_leaf_idx].right  =   leaf
+                    append = true
+                }
+            }
+        }
+        if(next)
+        {
+
+            if(next.type == 'BINARY_EXPRESSION')
+            {
+                if(leaf.type == 'BINARY_EXPRESSION')
+                {
+                    if((next.left))
                     {
-                        leaf.right                           =   clean_ast[next_leaf_idx]
-                        clean_ast[next_leaf_idx].right  =   leaf
-                        append(true)
+                        if(leaf.right && ((next.left.idx == leaf.right.idx) || (next.left.idx == leaf.idx) ))
+                        {
+                            if((operators_predececense[leaf.operator_sign] == operators_predececense[next.operator_sign]))
+                            {
+                                ast[next_idx].left = leaf
+                                leaf               = ast[next_idx]
+                                append             = true
+                            }
+                            else
+                            {
+                                leaf.right                    = ast[next_idx] 
+                                ast[next_idx].ignore          = true
+                                append = true
+                                
+                            }
+                        }
                     }
                 }
             }
-            
+            else
+            {
+                if(next_leaf_idx)
+                {
+                    leaf.right                            =   clean_ast[next_leaf_idx]
+                    clean_ast[next_leaf_idx].ignore       =   true
+                    append(true)
+                }
+            }
         }
-        if(append)
+            
+        
+        if(append && !ignore)
         {
             clean_ref[idx]=clean_ast.length
             clean_ast.push(leaf)
@@ -360,4 +359,4 @@ if(args.length)
     )
 }
 const ast_tree = ast_parse(clean_token)
-console.info(ast_tree)
+console.info(ast_tree[0])
