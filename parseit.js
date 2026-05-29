@@ -1,6 +1,13 @@
 #!/usr/bin/env node
 process.argv.splice(0,2)
 const lexit = require('lexitjs')
+const util = require('util')
+console.inspect  = (item)=>{
+    console.info(util.inspect(item,
+        {depth: null,
+        colors: true,
+        compact: false}))
+}
 const { fs,helpers } = require('./utils')
 const {operators_predececense} = helpers
 const lexer = new lexit.LexIt()
@@ -207,8 +214,6 @@ function ast_parse(dataset)
                             }
                         }
                     }
-                    // if()
-                    // 
                 }
             }
             if(append)
@@ -220,6 +225,29 @@ function ast_parse(dataset)
     }
     const clean_ast = binary_factor(ast)
     return clean_ast
+}
+function cleanAST(node) {
+    if (!node || typeof node !== 'object') return node
+
+    const cleaned = {
+        type: node.type,
+        operator: node.operator,
+        operator_sign: node.operator_sign,
+        value: node.value,
+        idx: node.idx,
+        left: null,
+        right: null
+    }
+
+    if (node.left) {
+        cleaned.left = cleanAST(node.left)
+    }
+
+    if (node.right) {
+        cleaned.right = cleanAST(node.right)
+    }
+
+    return cleaned
 }
 function binary_factor(ast)
 {
@@ -233,7 +261,7 @@ function binary_factor(ast)
         const   previous        = previous_idx              ? ast[previous_idx]     : null
         const   next            = next_idx                  ? ast[next_idx]         : null
         let     append          = false 
-        const   ignore          = leaf.ignore || leaf.type!= 'BINARY_EXPRESSION'
+        let     ignore          = leaf.ignore || leaf.type!= 'BINARY_EXPRESSION'
         
         if(previous)
         {
@@ -257,7 +285,6 @@ function binary_factor(ast)
                                 leaf.left                    = ast[previous_idx] 
                                 ast[previous_idx].ignore          = true
                                 append = true
-                                
                             }
                         }
                         else   
@@ -296,14 +323,27 @@ function binary_factor(ast)
                             {
                                 ast[next_idx].left = leaf
                                 leaf               = ast[next_idx]
-                                append             = true
+                                if(clean_ast[previous_idx])
+                                {
+                                    if(clean_ast[previous_idx].type == 'BINARY_EXPRESSION')
+                                    {
+                                        if((operators_predececense[clean_ast[previous_idx].operator_sign] < operators_predececense[next.operator_sign]))
+                                        {
+                                            clean_ast[previous_idx].right = leaf
+                                        }
+                                    }
+                                
+                                }
+                                else
+                                {
+                                    ignore             = false
+                                }
                             }
                             else
                             {
                                 leaf.right                    = ast[next_idx] 
                                 ast[next_idx].ignore          = true
-                                append = true
-                                
+                                append                        = true
                             }
                         }
                     }
@@ -315,7 +355,7 @@ function binary_factor(ast)
                 {
                     leaf.right                            =   clean_ast[next_leaf_idx]
                     clean_ast[next_leaf_idx].ignore       =   true
-                    append(true)
+                    append = true
                 }
             }
         }
@@ -327,7 +367,7 @@ function binary_factor(ast)
             clean_ast.push(leaf)
         }
     })
-    return clean_ast
+    return clean_ast.map(cleanAST)
 }
 const clean_token   =   [] 
 if(args.length)
@@ -359,4 +399,5 @@ if(args.length)
     )
 }
 const ast_tree = ast_parse(clean_token)
-console.info(ast_tree[0])
+// console.info(JSON.stringify(ast_tree))
+console.inspect(ast_tree)
