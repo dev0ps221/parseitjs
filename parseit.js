@@ -232,6 +232,57 @@ class ParseIt{
                         right
                     }
                 }
+                else if(type == "ASSIGNMENT_EXPRESSION")
+                {
+                    const {args,operators} = params
+                    // console.info("assignment here ",current_token)
+                    const expression_start = args.start
+                    const expression_end   = args.end.map(itm=>itm.toLowerCase())
+                    let   start_token_idx  = null
+                    let   end_token_idx    = null
+                    let   cursor           = current_pos-1
+                    let   test             = null
+                    let   assignees        = []
+                    let   assignments       = []
+                    while(cursor >= 0 && (start_token_idx==null))
+                    {
+                        test = dataset[cursor]
+                        const {value} = test.token[2]
+                        start_token_idx = value == expression_start ? test.pos : null
+                        cursor--
+                    }
+                    if(start_token_idx)
+                    {
+                        let assignee_idx = start_token_idx
+                        while(assignee_idx < current_pos)
+                        {
+                            assignees.push(dataset[assignee_idx])
+                            assignee_idx++
+                        }
+                        console.info('here',assignees,assignee_idx,current_pos)
+                    }
+                    cursor           = current_pos+1
+                    while(cursor < dataset.length && (end_token_idx==null))
+                    {   
+                        test = dataset[cursor]
+                        const value = test.token[1].toLowerCase()
+                        end_token_idx = expression_end.includes(value) ? test.pos : null
+                        cursor++
+                    }
+                    if(end_token_idx)
+                    {
+                        let assignment_idx = current_pos+1
+                        while(assignment_idx < end_token_idx)
+                        {
+                            assignments.push(dataset[assignment_idx])
+                            assignment_idx++
+                        }
+                    }
+                    assignees   = this.ast_parse(assignees)
+                    assignments = this.ast_parse(assignments)
+                    console.info('assignees',assignees)
+                    console.info('assignments',assignments)
+                }
                 else if(type == 'EOS')   
                 {
                     go_ahead = true
@@ -354,7 +405,7 @@ class ParseIt{
             is_end_of_statement: node.is_end_of_statement,
             is_specialchar: node.is_end_of_statement,
             is_litteral: node.is_end_of_statement,
-            is_identifier: node.is_end_of_statement,
+            is_identifier: node.is_identifier,
             operator_sign: node.operator_sign,
             value: node.value,
             idx: node.idx,
@@ -544,11 +595,29 @@ class ParseIt{
         {
             use_input = this.tokenize_input(args)
         }
+        use_input.push({
+            token: [
+                'eof',
+                'eof',
+                {
+                type: 'eos',
+                token: 'eof',
+                is_end_of_statement: true,
+                idx: 0,
+                value: 'eof',
+                operator: null,
+                operator_sign: null
+                }
+            ],
+            pos: use_input.length
+        })
+        console.inspect(use_input[0])
         return this.ast_parse(use_input)
     }
 }
+
 const parser = new ParseIt()
 // console.info(clean_token)
 const ast_tree = parser.parse(args)
 // console.info(JSON.stringify(ast_tree))
-console.inspect(ast_tree)
+// console.inspect(ast_tree)

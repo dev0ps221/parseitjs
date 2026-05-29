@@ -1,7 +1,7 @@
 [
   {
     "type": "EOS",
-    "from_tokens": ["NEWLINE"]
+    "from_tokens": ["NEWLINE","EOF"]
   },
   {
     "type": "LITERAL",
@@ -27,12 +27,12 @@
     "associativity": "left"
   },
   {
-    "type": "ASSIGNEMENT_EXPRESSION",
+    "type": "ASSIGNMENT_EXPRESSION",
     "operators": ["=", ":=", "+=", "-="],
     "associativity": "left",
     "args": {
       "start": "let",
-      "end": ["NEWLINE","SEMICOLON"],
+      "end": ["NEWLINE","SEMICOLON","EOF"],
       "delimiter": ","
     }
   },
