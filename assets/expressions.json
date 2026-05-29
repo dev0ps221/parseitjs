@@ -29,7 +29,6 @@
   {
     "type": "ASSIGNMENT_EXPRESSION",
     "operators": ["=", ":=", "+=", "-="],
-    "associativity": "left",
     "args": {
       "start": "let",
       "end": ["NEWLINE","SEMICOLON","EOF"],

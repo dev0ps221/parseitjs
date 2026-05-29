@@ -100,15 +100,17 @@ class ParseIt{
         const operator_sign     =   operator ? value : null
         const is_litteral       =   literals.includes(type.toLowerCase())
         const is_identifier     =   identifiers.includes(type.toLowerCase())
-        // console.info(specialchars,type)
         const is_specialchar    =   specialchars.includes(type.toLowerCase())
         const is_end_of_statement       =   end_of_statements.includes(type.toLowerCase())
         const is_group          =   groups.find(group=>group.start===value)
-        
-        if(is_operator){
 
-            const   matching_expressions    = helpers.expressions.filter(expression_ref=>expression_ref.hasOwnProperty('operators') && expression_ref.operators.includes(value))
+        if(is_operator || is_identifier){
+
+            const   matching_start          =  helpers.expressions.filter(expression_ref=>{return expression_ref.hasOwnProperty('args') && expression_ref.args.start == value})
+            const   matching_operators      =  helpers.expressions.filter(expression_ref=>(expression_ref.hasOwnProperty('operators') && expression_ref.operators.includes(value)))
+            const   matching_expressions    =  matching_start.length ? matching_start : matching_operators
             let     matched                 = null
+            
             if(matching_expressions.length)
             {
                 matching_expressions.map(expression_ref=>{
@@ -121,6 +123,10 @@ class ParseIt{
                                 matched = {...expression_ref,left:previous[2],idx:previous_pos,operator,operator_sign,value}
                             }
                         }
+                    }
+                    else
+                    {
+                        matched = {...expression_ref,idx:pos,value}   
                     }
                 })
             }
@@ -139,6 +145,7 @@ class ParseIt{
             if(is_specialchar)
             {
                 token[2]                 = {...specialchar_expression,is_specialchar,idx:pos,value,operator,operator_sign}
+                token['is_'+type]    = true
             }
             if(is_identifier)
             {
@@ -193,13 +200,13 @@ class ParseIt{
     }
     ast_parse(dataset)
     {
-        // console.info(dataset)
         const ast                   = []
         let current_pos             = 0
         const token_set_size        = dataset.length
         while(current_pos < token_set_size)
         {
             
+            let can_do                      = true
             let     node                    =   null
             const   current_token           =   dataset[current_pos]
             const   {token,pos,operator,operator_sign}    =   current_token
@@ -212,7 +219,7 @@ class ParseIt{
             }
             const params                = token.length > 1 ? token[2] : {}
             const type                  = params ? params.type : ''
-            // console.info(type,'in here',token)
+            
             let go_ahead = false
             if(type.toLowerCase() != 'literal')
             {
@@ -232,56 +239,133 @@ class ParseIt{
                         right
                     }
                 }
+                // else if(type == "ASSIGNMENT_EXPRESSION")
+                // {
+                //     const {args,operators} = params
+                //     console.info("assignment here ",current_token)
+                //     const expression_start = args.start
+                //     const expression_end   = args.end.map(itm=>itm.toLowerCase())
+                //     let   start_token_idx  = null
+                //     let   end_token_idx    = null
+                //     let   cursor           = current_pos-1
+                //     let   test             = null
+                //     let   assignees        = []
+                //     let   assignments       = []
+                    
+                //     while(cursor >= 0 && (start_token_idx==null))
+                //     {
+                //         test = dataset[cursor]
+                //         const {value} = test.token[2] ? test.token[2] : {}
+                //         start_token_idx = value == expression_start ? test.pos : null
+                //         cursor--
+                //     }
+                //     if(start_token_idx)
+                //     {
+                //         let assignee_idx = start_token_idx
+                //         while(assignee_idx < current_pos)
+                //         {
+                //             if(!dataset[assignee_idx].token.is_space)
+                //             {
+                //                 assignees.push(dataset[assignee_idx])
+                //             }
+                //             assignee_idx++
+                //         }
+                //     }
+                //     cursor           = current_pos+1
+                //     while(cursor < dataset.length && (end_token_idx==null))
+                //     {   
+                //         test = dataset[cursor]
+                //         const value = test.token[1].toLowerCase()
+                //         end_token_idx = expression_end.includes(value) ? test.pos : null
+                //         cursor++
+                //     }
+                //     if(end_token_idx)
+                //     {
+                //         let assignment_idx = current_pos+1
+                //         while(assignment_idx < end_token_idx)
+                //         {
+
+                //             if(!dataset[assignment_idx].token.is_space)
+                //             {
+                //                 assignments.push(dataset[assignment_idx])
+                //             }
+                //             assignment_idx++
+                //         }
+                //     }
+
+                //     assignees   = this.ast_parse(assignees.map((item,idx)=>{item.pos=idx;return item}))
+                //     assignments = this.ast_parse(assignments.map((item,idx)=>{item.pos=idx;return item}))
+                //     go_ahead = true
+                //     node = {
+                //         type,
+                //         operator:params.operator,
+                //         operator_sign:params.operator_sign,
+                //         value:assignments,
+                //         assignees,
+                //         assignments,
+                //         idx:current_pos,
+                //         previous,
+                //         next
+                //     }
+                //     current_pos += end_token_idx+1 - current_pos
+                // }
+
                 else if(type == "ASSIGNMENT_EXPRESSION")
                 {
+                    
                     const {args,operators} = params
-                    // console.info("assignment here ",current_token)
                     const expression_start = args.start
                     const expression_end   = args.end.map(itm=>itm.toLowerCase())
-                    let   start_token_idx  = null
+                    let   start_token_idx  = current_pos+1
                     let   end_token_idx    = null
-                    let   cursor           = current_pos-1
+                    let   cursor           = start_token_idx
                     let   test             = null
                     let   assignees        = []
-                    let   assignments       = []
-                    while(cursor >= 0 && (start_token_idx==null))
+                    let   assignments      = []
+                    let   operator         = null
+                    while((cursor >= 0) && (cursor < dataset.length) && (end_token_idx == null))
                     {
-                        test = dataset[cursor]
-                        const {value} = test.token[2]
-                        start_token_idx = value == expression_start ? test.pos : null
-                        cursor--
-                    }
-                    if(start_token_idx)
-                    {
-                        let assignee_idx = start_token_idx
-                        while(assignee_idx < current_pos)
+                        const test            =   dataset[cursor]
+                        const value           =   (test.token[2] && test.token[2].toLowerCase) ? test.token[2].toLowerCase() : test.token[2]
+                        let is_operator       =   helpers.operators.hasOwnProperty(value)
+                        
+                        if(is_operator && operators.includes(value))
                         {
-                            assignees.push(dataset[assignee_idx])
-                            assignee_idx++
+                            operator = value
+                            cursor++
                         }
-                        console.info('here',assignees,assignee_idx,current_pos)
-                    }
-                    cursor           = current_pos+1
-                    while(cursor < dataset.length && (end_token_idx==null))
-                    {   
-                        test = dataset[cursor]
-                        const value = test.token[1].toLowerCase()
+                    
                         end_token_idx = expression_end.includes(value) ? test.pos : null
+                        if(!end_token_idx)
+                        {
+                            if(operator)
+                            {
+                                assignments.push(dataset[cursor])
+                            }
+                            else
+                            {
+                                assignees.push(dataset[cursor])
+                            }
+                            dataset[cursor]
+                        }
                         cursor++
                     }
-                    if(end_token_idx)
-                    {
-                        let assignment_idx = current_pos+1
-                        while(assignment_idx < end_token_idx)
-                        {
-                            assignments.push(dataset[assignment_idx])
-                            assignment_idx++
-                        }
+                    assignees   = this.ast_parse(assignees.map((item,idx)=>{item.pos=idx;return item}))
+                    assignments = this.ast_parse(assignments.map((item,idx)=>{item.pos=idx;return item}))
+                    go_ahead = true
+                    node = {
+                        type,
+                        operator:params.operator,
+                        operator_sign:params.operator_sign,
+                        value:assignments,
+                        assignees,
+                        assignments,
+                        idx:current_pos,
+                        previous,
+                        next
                     }
-                    assignees   = this.ast_parse(assignees)
-                    assignments = this.ast_parse(assignments)
-                    console.info('assignees',assignees)
-                    console.info('assignments',assignments)
+                    current_pos += end_token_idx+ - current_pos
+                    console.info(current_pos)
                 }
                 else if(type == 'EOS')   
                 {
@@ -300,6 +384,10 @@ class ParseIt{
                 else
                 {
                     go_ahead = true
+                    if(params && params.value == " " || (!type))
+                    {
+                        can_do = false
+                    }
                     node = {
                         type,
                         is_end_of_statement:params ? params.is_end_of_statement:null,
@@ -333,11 +421,12 @@ class ParseIt{
             }
             if(node)
             {
-                let append = true
+                let append = can_do
                 if(node.type == 'SPECIALCHAR')
                 {
                     go_ahead = true
                 }
+
                 if(!go_ahead)
                 {
                     if(previous)
@@ -392,7 +481,6 @@ class ParseIt{
             }
             current_pos++
         }
-        // console.info(ast)
         const clean_ast = this.binary_factor(ast)
         return clean_ast
     }
@@ -407,10 +495,16 @@ class ParseIt{
             is_litteral: node.is_end_of_statement,
             is_identifier: node.is_identifier,
             operator_sign: node.operator_sign,
+            assignees: node.assignees,
+            assignments: node.assignments,
             value: node.value,
             idx: node.idx,
             left: null,
             right: null
+        }
+        if(cleaned.is_specialchar)
+        {
+            cleaned['is_'+(node.type ? node.type : '').toLowerCase()] = node['is_'+(node.type ? node.type : '').toLowerCase()]
         }
 
         if (node.left) {
@@ -425,7 +519,6 @@ class ParseIt{
     }
     binary_factor(ast)
     {
-        // console.info(ast)
         const clean_ast = []
         const clean_ref = {}
         ast.map((leaf,idx)=>{
@@ -436,7 +529,7 @@ class ParseIt{
             const   previous        = previous_idx              ? ast[previous_idx]     : null
             const   next            = next_idx                  ? ast[next_idx]         : null
             let     append          = false || leaf.type!= 'BINARY_EXPRESSION'
-            let     ignore          = leaf.ignore || leaf.type!= 'BINARY_EXPRESSION'
+            let     ignore          = leaf.ignore ? true : (leaf.type != 'BINARY_EXPRESSION')
             
             if(previous)
             {
@@ -488,7 +581,6 @@ class ParseIt{
             }
             if(next)
             {
-
                 if(next.type == 'BINARY_EXPRESSION')
                 {
                     if(leaf.type == 'BINARY_EXPRESSION')
@@ -538,20 +630,35 @@ class ParseIt{
                 }
             }
 
+            if(leaf.type == 'BINARY_EXPRESSION' && (!previous || (previous.type != 'BINARY_EXPRESSION')) && (!next || (next.type != 'BINARY_EXPRESSION')))
+            {
+                append = true
+            }
+            if(leaf.type == 'ASSIGNMENT_EXPRESSION')
+            {
+                append = true
+                ignore = false
+            }
+
             if(leaf.is_end_of_statement)
             {
                 append = true
                 ignore = false
             }
-            // console.info(leaf,append,ignore)
+            if(leaf.type == 'IDENTIFIER')
+            {
+                append = true
+                ignore = false
+            }
             if(append && !ignore)
             {
                 clean_ref[idx]=clean_ast.length
                 clean_ast.push(leaf)
             }
         })
-        // console.info(clean_ast)
-        return clean_ast.map((ast_item)=>this.cleanAST(ast_item))
+        return clean_ast.map((ast_item)=>{
+            return this.cleanAST(ast_item)
+        })
     }
 
     tokenize_input(args,use_input)
@@ -611,13 +718,11 @@ class ParseIt{
             ],
             pos: use_input.length
         })
-        console.inspect(use_input[0])
+        // console.inspect(use_input[0])
         return this.ast_parse(use_input)
     }
 }
 
 const parser = new ParseIt()
-// console.info(clean_token)
 const ast_tree = parser.parse(args)
-// console.info(JSON.stringify(ast_tree))
-// console.inspect(ast_tree)
+console.inspect(ast_tree)
