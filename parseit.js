@@ -84,7 +84,10 @@ function process_token(token_list,pos){
                 }
             })
         }
-        matched.operator_sign = operator_sign
+        if(matched)
+        {
+            matched.operator_sign = operator_sign
+        }
         token[2] = matched
     }
     else
