@@ -140,6 +140,7 @@ function ast_parse(dataset)
                 node = {
                     type,
                     operator:params.operator,
+                    operator_sign:params.operator_sign,
                     value:params.value,
                     left,
                     idx:current_pos,
@@ -154,6 +155,7 @@ function ast_parse(dataset)
             node = {
                 type,
                 operator:params.operator,
+                operator_sign:params.operator_sign,
                 value:params.value,
                 previous,
                 next,
@@ -287,6 +289,7 @@ function binary_factor(ast)
                             {
                                 if(operators_predececense[leaf.operator_sign] < operators_predececense[next.operator_sign])
                                 {
+                                    ast[next_idx].left            = leaf
                                     if(next_leaf_idx)
                                     {
                                         clean_ast[next_leaf_idx].left = leaf
@@ -296,6 +299,7 @@ function binary_factor(ast)
                                 else
                                 {
                                     leaf.right = next
+                                    ast[next_idx].ignore            = true
                                     if(next_leaf_idx)
                                     {
                                         clean_ast[next_leaf_idx].ignore = true
@@ -318,10 +322,9 @@ function binary_factor(ast)
             }
             
         }
-        console.info(append,leaf)
         if(append)
         {
-            clean_ref[idx,leaf.idx]
+            clean_ref[idx]=clean_ast.length
             clean_ast.push(leaf)
         }
     })
