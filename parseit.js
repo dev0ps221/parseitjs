@@ -21,9 +21,25 @@ const literal_expression = helpers.expressions.filter(
             }
         }
     )[0]
+const end_of_statement = helpers.expressions.filter(
+    expression_ref=>{
+        if(expression_ref.type.toLowerCase()=='eos')
+        {
+            return (expression_ref.from_tokens)
+        }
+    }
+)[0]
 const literals = helpers.expressions.filter(
         expression_ref=>{
             if(expression_ref.type.toLowerCase()=='literal')
+            {
+                return (expression_ref.from_tokens)
+            }
+        }
+    ).map(expression_ref=>expression_ref.from_tokens.map(ft=>ft.toLowerCase()))[0]
+const end_of_statements = helpers.expressions.filter(
+        expression_ref=>{
+            if(expression_ref.type.toLowerCase()=='eos')
             {
                 return (expression_ref.from_tokens)
             }
@@ -48,6 +64,7 @@ function process_token(token_list,pos){
     const operator          =   is_operator ? helpers.operators[value] : null
     const operator_sign     =   operator ? value : null
     const is_litteral       =   literals.includes(type)
+    const is_end_of_statement       =   end_of_statements.includes(type)
     const is_group          =   groups.find(group=>group.start===value)
     if(is_operator){
         const   matching_expressions    = helpers.expressions.filter(expression_ref=>expression_ref.hasOwnProperty('operators') && expression_ref.operators.includes(value))
@@ -75,6 +92,10 @@ function process_token(token_list,pos){
         if(is_litteral)
         {
             token[2]                 = {...literal_expression,idx:pos,value,operator,operator_sign}
+        }
+        if(is_end_of_statement)
+        {
+            token[2]                 = {...end_of_statement,idx:pos,value,operator,operator_sign}
         }
         if(is_group)
         {
@@ -138,6 +159,7 @@ function ast_parse(dataset)
         }
         const params                = token.length > 1 ? token[2] : {}
         const type                  = params ? params.type : ''
+        let go_ahead = false
         if(type.toLowerCase() != 'literal')
         {
             if(type == 'BINARY_EXPRESSION')   
@@ -156,6 +178,20 @@ function ast_parse(dataset)
                     right
                 }
             }
+            if(type == 'EOS')   
+            {
+                go_ahead = true
+                node = {
+                    type,
+                    operator:params.operator,
+                    operator_sign:params.operator_sign,
+                    value:params.value,
+                    is_end_of_statement:true,
+                    idx:current_pos,
+                    previous,
+                    next
+                }
+            }
         }
         else
         {
@@ -172,45 +208,48 @@ function ast_parse(dataset)
         if(node)
         {
             let append = true
-            if(previous)
+            if(!go_ahead)
             {
-                if(previous.type == 'BINARY_EXPRESSION')
+                if(previous)
                 {
-                    if(node.type != 'BINARY_EXPRESSION' || (operators_predececense[previous.operator_sign] > operators_predececense[node.operator_sign]) )
+                    if(previous.type == 'BINARY_EXPRESSION')
                     {
-                        previous.right  =   node
-                        append          =   false 
-                    }
+                        if(node.type != 'BINARY_EXPRESSION' || (operators_predececense[previous.operator_sign] > operators_predececense[node.operator_sign]) )
+                        {
+                            previous.right  =   node
+                            append          =   false 
+                        }
+                        else
+                        {
+                            node.left       = previous
+                        }
+                    }   
                     else
                     {
-                        node.left       = previous
-                    }
-                }   
-                else
-                {
-                    if(node.type == 'BINARY_EXPRESSION')
-                    {
-                        node.left = previous
+                        if(node.type == 'BINARY_EXPRESSION')
+                        {
+                            node.left = previous
+                        }
                     }
                 }
-            }
-            if(next)
-            {
-                if(next.type =='BINARY_EXPRESSION')
+                if(next)
                 {
-                    if(node.type != 'BINARY_EXPRESSION')
+                    if(next.type =='BINARY_EXPRESSION')
                     {
-                        next.left = node
-                        append    = false
-                        if(previous && previous.type == 'BINARY_EXPRESSION')
+                        if(node.type != 'BINARY_EXPRESSION')
                         {
-                            if(operators_predececense[previous.operator_sign] > operators_predececense[next.operator_sign])
+                            next.left = node
+                            append    = false
+                            if(previous && previous.type == 'BINARY_EXPRESSION')
                             {
-                                previous.right  = node
-                            }
-                            else
-                            {
-                                node.left       = previous
+                                if(operators_predececense[previous.operator_sign] > operators_predececense[next.operator_sign])
+                                {
+                                    previous.right  = node
+                                }
+                                else
+                                {
+                                    node.left       = previous
+                                }
                             }
                         }
                     }
@@ -223,6 +262,7 @@ function ast_parse(dataset)
         }
         current_pos++
     }
+    // console.info(ast)
     const clean_ast = binary_factor(ast)
     return clean_ast
 }
@@ -232,6 +272,7 @@ function cleanAST(node) {
     const cleaned = {
         type: node.type,
         operator: node.operator,
+        is_end_of_statement: node.is_end_of_statement,
         operator_sign: node.operator_sign,
         value: node.value,
         idx: node.idx,
@@ -251,6 +292,7 @@ function cleanAST(node) {
 }
 function binary_factor(ast)
 {
+    // console.info(ast)
     const clean_ast = []
     const clean_ref = {}
     ast.map((leaf,idx)=>{
@@ -260,7 +302,7 @@ function binary_factor(ast)
         const   next_leaf_idx   = clean_ref.hasOwnProperty(next_idx) ? clean_ref[next_idx] : null
         const   previous        = previous_idx              ? ast[previous_idx]     : null
         const   next            = next_idx                  ? ast[next_idx]         : null
-        let     append          = false 
+        let     append          = false || leaf.type!= 'BINARY_EXPRESSION'
         let     ignore          = leaf.ignore || leaf.type!= 'BINARY_EXPRESSION'
         
         if(previous)
@@ -300,12 +342,15 @@ function binary_factor(ast)
             }
             else
             {
-                if(previous_leaf_idx)
+                if(!previous.is_end_of_statement)
                 {
-                    leaf.left                           =   clean_ast[previous_leaf_idx]
-                    clean_ast[previous_leaf_idx].right  =   leaf
-                    append = true
+                    if(previous_leaf_idx)
+                    {
+                        leaf.left                           =   clean_ast[previous_leaf_idx]
+                        clean_ast[previous_leaf_idx].right  =   leaf
+                    }
                 }
+                append = true
             }
         }
         if(next)
@@ -359,14 +404,20 @@ function binary_factor(ast)
                 }
             }
         }
-            
-        
+
+        if(leaf.is_end_of_statement)
+        {
+            append = true
+            ignore = false
+        }
+        // console.info(leaf,append,ignore)
         if(append && !ignore)
         {
             clean_ref[idx]=clean_ast.length
             clean_ast.push(leaf)
         }
     })
+    // console.info(clean_ast)
     return clean_ast.map(cleanAST)
 }
 const clean_token   =   [] 
@@ -398,6 +449,7 @@ if(args.length)
         }
     )
 }
+// console.info(clean_token)
 const ast_tree = ast_parse(clean_token)
 // console.info(JSON.stringify(ast_tree))
 console.inspect(ast_tree)
