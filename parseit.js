@@ -2,12 +2,13 @@
 process.argv.splice(0,2)
 const lexit = require('lexitjs')
 const { fs,helpers } = require('./utils')
+const {operators_predececense} = helpers
 const lexer = new lexit.LexIt()
 const args  = process.argv
 const name  = __filename 
 const literal_expression = helpers.expressions.filter(
         expression_ref=>{
-            if(expression_ref.type.toLowerCase('literal'))
+            if(expression_ref.type.toLowerCase()=='literal')
             {
                 return (expression_ref.from_tokens)
             }
@@ -15,7 +16,7 @@ const literal_expression = helpers.expressions.filter(
     )[0]
 const literals = helpers.expressions.filter(
         expression_ref=>{
-            if(expression_ref.type.toLowerCase('literal'))
+            if(expression_ref.type.toLowerCase()=='literal')
             {
                 return (expression_ref.from_tokens)
             }
@@ -38,6 +39,7 @@ function process_token(token_list,pos){
     const [type,value]      =   token
     const is_operator       =   helpers.operators.hasOwnProperty(value)
     const operator          =   is_operator ? helpers.operators[value] : null
+    const operator_sign     =   operator ? value : null
     const is_litteral       =   literals.includes(type)
     const is_group          =   groups.find(group=>group.start===value)
     if(is_operator){
@@ -52,19 +54,20 @@ function process_token(token_list,pos){
                     {
                         if(previous_pos>=0)
                         {
-                            matched = {...expression_ref,left:previous[2],idx:previous_pos,operator,value}
+                            matched = {...expression_ref,left:previous[2],idx:previous_pos,operator,operator_sign,value}
                         }
                     }
                 }
             })
         }
+        matched.operator_sign = operator_sign
         token[2] = matched
     }
     else
     {
         if(is_litteral)
         {
-            token[2]                 = {...literal_expression,idx:pos,value,operator}
+            token[2]                 = {...literal_expression,idx:pos,value,operator,operator_sign}
         }
         if(is_group)
         {
@@ -76,6 +79,7 @@ function process_token(token_list,pos){
             let test_token_value        = test_token[1]
             let token_count =   0 
             let matched_end =   (test_token == current_group.end)
+            test_token.operator_sign = operator_sign
             while((token_list.length > cursor) && (test_token_value != current_group.end))
             {
                 token_set.push(test_token)
@@ -106,7 +110,7 @@ function process_token(token_list,pos){
         }
     }
     pos++
-    return {token,pos,operator,value}
+    return {token,pos,operator,operator_sign,value}
 }
 function ast_parse(dataset)
 {
@@ -115,8 +119,11 @@ function ast_parse(dataset)
     const token_set_size        = dataset.length
     while(current_pos < token_set_size)
     {
-        const current_token         = dataset[current_pos]
-        const {token,pos,operator}           = current_token
+        let     node                    =   null
+        const   current_token           =   dataset[current_pos]
+        const   {token,pos,operator,operator_sign}    =   current_token
+        const   previous                =    ((dataset.length > (current_pos-1)) && (dataset[current_pos-1] && dataset[current_pos-1].token) && (dataset[current_pos-1].token.length>1)) ? dataset[current_pos-1].token[2] : null
+        const   next                    =    ((dataset.length > (current_pos+1)) && (dataset[current_pos+1] && dataset[current_pos+1].token) && (dataset[current_pos+1].token.length>1)) ? dataset[current_pos+1].token[2] : null
         if(token.length <2)
         {
             console.info(' incorrect token configuration ',token)
@@ -130,20 +137,195 @@ function ast_parse(dataset)
             {
                 let left    = params.left 
                 let right   = (dataset.length > current_pos+1) ? dataset[current_pos+1].token[2] : null
-                const node = {
+                node = {
                     type,
                     operator:params.operator,
                     value:params.value,
                     left,
                     idx:current_pos,
+                    previous,
+                    next,
                     right
                 }
+            }
+        }
+        else
+        {
+            node = {
+                type,
+                operator:params.operator,
+                value:params.value,
+                previous,
+                next,
+                idx:current_pos,
+            }
+        }
+        if(node)
+        {
+            let append = true
+            if(previous)
+            {
+                if(previous.type == 'BINARY_EXPRESSION')
+                {
+                    if(node.type != 'BINARY_EXPRESSION' || (operators_predececense[previous.operator_sign] > operators_predececense[node.operator_sign]) )
+                    {
+                        previous.right  =   node
+                        append          =   false 
+                    }
+                    else
+                    {
+                        node.left       = previous
+                    }
+                }   
+                else
+                {
+                    if(node.type == 'BINARY_EXPRESSION')
+                    {
+                        node.left = previous
+                    }
+                }
+            }
+            if(next)
+            {
+                if(next.type =='BINARY_EXPRESSION')
+                {
+                    if(node.type != 'BINARY_EXPRESSION')
+                    {
+                        next.left = node
+                        append    = false
+                        if(previous && previous.type == 'BINARY_EXPRESSION')
+                        {
+                            if(operators_predececense[previous.operator_sign] > operators_predececense[next.operator_sign])
+                            {
+                                previous.right  = node
+                            }
+                            else
+                            {
+                                node.left       = previous
+                            }
+                        }
+                    }
+                    // if()
+                    // 
+                }
+            }
+            if(append)
+            {
                 ast.push(node)
             }
         }
         current_pos++
     }
-    return clean_ast(ast)
+    const clean_ast = binary_factor(ast)
+    return clean_ast
+}
+function binary_factor(ast)
+{
+    const clean_ast = []
+    const clean_ref = {}
+    ast.map((leaf,idx)=>{
+        const   previous_idx    = idx > 0                   ? (idx - 1)             : null 
+        const   next_idx        = (ast.length > (idx + 1))  ? (idx + 1)             : null 
+        const   previous_leaf_idx   = clean_ref.hasOwnProperty(previous_idx) ? clean_ref[previous_idx] : null
+        const   next_leaf_idx   = clean_ref.hasOwnProperty(next_idx) ? clean_ref[next_idx] : null
+        const   previous        = previous_idx              ? ast[previous_idx]     : null
+        const   next            = next_idx                  ? ast[next_idx]         : null
+        let     append          = false 
+        const   ignore          = leaf.ignore || leaf.type!= 'BINARY_EXPRESSION'
+        if(!ignore)
+        {
+            if(previous)
+            {
+                if(previous.type == 'BINARY_EXPRESSION')
+                {
+                    if(leaf.type == 'BINARY_EXPRESSION')
+                    {
+                        if((previous.right))
+                        {
+                            if(leaf.left && ((previous.right.idx == leaf.left.idx) || (previous.right.idx == leaf.idx) ))
+                            {
+                                if(operators_predececense[leaf.operator_sign] < operators_predececense[previous.operator_sign])
+                                {
+                                    if(previous_leaf_idx)
+                                    {
+                                        clean_ast[previous_leaf_idx].right = leaf
+                                    }
+                                    append                              = false
+                                }
+                            }
+                            else   
+                            {   
+                                if(previous_leaf_idx)
+                                {
+                                    clean_ast[previous_leaf_idx]        =   clean_ast[previous_leaf_idx]
+                                    append                              = false
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    if(previous_leaf_idx)
+                    {
+                        leaf.left                           =   clean_ast[previous_leaf_idx]
+                        clean_ast[previous_leaf_idx].right  =   leaf
+                        append = true
+                    }
+                }
+            }
+            if(next)
+            {
+
+                if(next.type == 'BINARY_EXPRESSION')
+                {
+                    if(leaf.type == 'BINARY_EXPRESSION')
+                    {
+                        if((next.left))
+                        {
+                            if(leaf.right && ((next.left.idx == leaf.right.idx) || (next.left.idx == leaf.idx) ))
+                            {
+                                if(operators_predececense[leaf.operator_sign] < operators_predececense[next.operator_sign])
+                                {
+                                    if(next_leaf_idx)
+                                    {
+                                        clean_ast[next_leaf_idx].left = leaf
+                                    }
+                                    leaf.ignore     = true
+                                }
+                                else
+                                {
+                                    leaf.right = next
+                                    if(next_leaf_idx)
+                                    {
+                                        clean_ast[next_leaf_idx].ignore = true
+                                    }
+                                    append = true
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    if(next_leaf_idx)
+                    {
+                        leaf.right                           =   clean_ast[next_leaf_idx]
+                        clean_ast[next_leaf_idx].right  =   leaf
+                        append(true)
+                    }
+                }
+            }
+            
+        }
+        console.info(append,leaf)
+        if(append)
+        {
+            clean_ref[idx,leaf.idx]
+            clean_ast.push(leaf)
+        }
+    })
+    return clean_ast
 }
 const clean_token   =   [] 
 if(args.length)
@@ -173,60 +355,6 @@ if(args.length)
             }
         }
     )
-}
-function merge_nodes(node,previous_node,next_node,current_pos,previous_pos,next_pos,raw_ast)
-{
-    if(next_node.type == "LITERAL" && (next_node.idx == node.right.idx) )
-    {
-        node.right = next_node
-        previous_pos++
-        current_pos++
-        next_pos++
-    }
-    else if(next_node.type == "BINARY_EXPRESSION" && (next_node.left.idx == node.right.idx) )
-    {
-        node.right = next_node
-        while(next_pos+1 < raw_ast.length)
-        {
-            previous_pos++
-            current_pos++
-            next_pos++
-            node              = (raw_ast.length > current_pos)    ? raw_ast[current_pos]  : null
-            previous_node     = (raw_ast.length > previous_pos)   ? raw_ast[previous_pos] : null
-            next_node         = (raw_ast.length > next_pos)       ? raw_ast[next_pos]     : null
-            var {node,previous_node,next_node,current_pos,previous_pos,next_pos} = merge_nodes(node,previous_node,next_node,current_pos,previous_pos,next_pos,raw_ast)
-            node.right = next_node
-        }
-        previous_pos++
-        current_pos++
-        next_pos++
-    }
-    return {node,previous_node,next_node,current_pos,previous_pos,next_pos}
-}
-function clean_ast(raw_ast)
-{
-    const   ast             = []
-    var     current_pos     = 0
-    var     previous_pos    = current_pos-1
-    var     next_pos        = current_pos+1
-    while (current_pos < raw_ast.length)
-    {
-        var node              = (raw_ast.length > current_pos)    ? raw_ast[current_pos]  : null
-        var previous_node     = (raw_ast.length > previous_pos)   ? raw_ast[previous_pos] : null
-        var next_node         = (raw_ast.length > next_pos)       ? raw_ast[next_pos]     : null
-        if(node.type == "BINARY_EXPRESSION")
-        {
-            if(next_node)
-            {
-                var {node,previous_node,next_node,current_pos,previous_pos,next_pos} = merge_nodes(node,previous_node,next_node,current_pos,previous_pos,next_pos,raw_ast)
-            }
-        }
-        ast.push(node)
-        previous_pos++
-        current_pos++
-        next_pos++
-    }
-    return ast
 }
 const ast_tree = ast_parse(clean_token)
 console.info(ast_tree)

@@ -9,7 +9,10 @@ const assets_path               = (sub=null)=>current_path('assets')+(sub?(sub.s
 
 const    expressions            = read_json(assets_path('expressions.json'))
 const    statements             = read_json(assets_path('statements.json'))
+const    operators_predececense = read_json(assets_path('operators_predececense.json'))
+
 
 utils.helpers.statements = statements
 utils.helpers.expressions = expressions
+utils.helpers.operators_predececense = operators_predececense
 module.exports                  = utils
