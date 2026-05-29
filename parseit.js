@@ -13,6 +13,14 @@ const {operators_predececense} = helpers
 const lexer = new lexit.LexIt()
 const args  = process.argv
 const name  = __filename 
+const identifier_expression = helpers.expressions.filter(
+        expression_ref=>{
+            if(expression_ref.type.toLowerCase()=='identifier')
+            {
+                return (expression_ref.token)
+            }
+        }
+    )[0]
 const literal_expression = helpers.expressions.filter(
         expression_ref=>{
             if(expression_ref.type.toLowerCase()=='literal')
@@ -21,6 +29,14 @@ const literal_expression = helpers.expressions.filter(
             }
         }
     )[0]
+const specialchar_expression = helpers.expressions.filter(
+    expression_ref=>{
+        if(expression_ref.type.toLowerCase()=='specialchar')
+        {
+            return (expression_ref.from_tokens)
+        }
+    }
+)[0]
 const end_of_statement = helpers.expressions.filter(
     expression_ref=>{
         if(expression_ref.type.toLowerCase()=='eos')
@@ -37,6 +53,24 @@ const literals = helpers.expressions.filter(
             }
         }
     ).map(expression_ref=>expression_ref.from_tokens.map(ft=>ft.toLowerCase()))[0]
+
+const identifiers = helpers.expressions.filter(
+        expression_ref=>{
+            if(expression_ref.type.toLowerCase()=='identifier')
+            {
+                return expression_ref.token
+            }
+        }
+    ).map(expression_ref=>expression_ref.token.toLowerCase())[0]
+const specialchars = helpers.expressions.filter(
+        expression_ref=>{
+            if(expression_ref.type.toLowerCase()=='specialchar')
+            {
+                return expression_ref.from_tokens
+            }
+        }
+    ).map(expression_ref=>expression_ref.from_tokens.map(ft=>ft.toLowerCase()))[0]
+    
 const end_of_statements = helpers.expressions.filter(
         expression_ref=>{
             if(expression_ref.type.toLowerCase()=='eos')
@@ -64,10 +98,15 @@ class ParseIt{
         const is_operator       =   helpers.operators.hasOwnProperty(value)
         const operator          =   is_operator ? helpers.operators[value] : null
         const operator_sign     =   operator ? value : null
-        const is_litteral       =   literals.includes(type)
-        const is_end_of_statement       =   end_of_statements.includes(type)
+        const is_litteral       =   literals.includes(type.toLowerCase())
+        const is_identifier     =   identifiers.includes(type.toLowerCase())
+        // console.info(specialchars,type)
+        const is_specialchar    =   specialchars.includes(type.toLowerCase())
+        const is_end_of_statement       =   end_of_statements.includes(type.toLowerCase())
         const is_group          =   groups.find(group=>group.start===value)
+        
         if(is_operator){
+
             const   matching_expressions    = helpers.expressions.filter(expression_ref=>expression_ref.hasOwnProperty('operators') && expression_ref.operators.includes(value))
             let     matched                 = null
             if(matching_expressions.length)
@@ -95,11 +134,19 @@ class ParseIt{
         {
             if(is_litteral)
             {
-                token[2]                 = {...literal_expression,idx:pos,value,operator,operator_sign}
+                token[2]                 = {...literal_expression,is_litteral,idx:pos,value,operator,operator_sign}
+            }
+            if(is_specialchar)
+            {
+                token[2]                 = {...specialchar_expression,is_specialchar,idx:pos,value,operator,operator_sign}
+            }
+            if(is_identifier)
+            {
+                token[2]                 = {...identifier_expression,is_identifier,idx:pos,value,operator,operator_sign}
             }
             if(is_end_of_statement)
             {
-                token[2]                 = {...end_of_statement,idx:pos,value,operator,operator_sign}
+                token[2]                 = {...end_of_statement,idx:pos,is_end_of_statement,value,operator,operator_sign}
             }
             if(is_group)
             {
@@ -146,11 +193,13 @@ class ParseIt{
     }
     ast_parse(dataset)
     {
+        // console.info(dataset)
         const ast                   = []
         let current_pos             = 0
         const token_set_size        = dataset.length
         while(current_pos < token_set_size)
         {
+            
             let     node                    =   null
             const   current_token           =   dataset[current_pos]
             const   {token,pos,operator,operator_sign}    =   current_token
@@ -163,6 +212,7 @@ class ParseIt{
             }
             const params                = token.length > 1 ? token[2] : {}
             const type                  = params ? params.type : ''
+            // console.info(type,'in here',token)
             let go_ahead = false
             if(type.toLowerCase() != 'literal')
             {
@@ -182,7 +232,7 @@ class ParseIt{
                         right
                     }
                 }
-                if(type == 'EOS')   
+                else if(type == 'EOS')   
                 {
                     go_ahead = true
                     node = {
@@ -196,11 +246,32 @@ class ParseIt{
                         next
                     }
                 }
+                else
+                {
+                    go_ahead = true
+                    node = {
+                        type,
+                        is_end_of_statement:params ? params.is_end_of_statement:null,
+                        is_specialchar:params ? params.is_specialchar:null,
+                        is_litteral:params ? params.is_litteral:null,
+                        is_identifier:params ? params.is_identifier:null,
+                        operator:params ? params.operator:null,
+                        operator_sign:params ? params.operator_sign:null,
+                        value:params ? params.value:null,
+                        idx:current_pos,
+                        previous,
+                        next
+                    }
+
+                }
             }
             else
             {
                 node = {
                     type,
+                    is_end_of_statement:params.is_end_of_statement,
+                    is_litteral:params.is_litteral,
+                    is_identifier:params.is_identifier,
                     operator:params.operator,
                     operator_sign:params.operator_sign,
                     value:params.value,
@@ -212,6 +283,10 @@ class ParseIt{
             if(node)
             {
                 let append = true
+                if(node.type == 'SPECIALCHAR')
+                {
+                    go_ahead = true
+                }
                 if(!go_ahead)
                 {
                     if(previous)
@@ -277,6 +352,9 @@ class ParseIt{
             type: node.type,
             operator: node.operator,
             is_end_of_statement: node.is_end_of_statement,
+            is_specialchar: node.is_end_of_statement,
+            is_litteral: node.is_end_of_statement,
+            is_identifier: node.is_end_of_statement,
             operator_sign: node.operator_sign,
             value: node.value,
             idx: node.idx,
@@ -346,7 +424,7 @@ class ParseIt{
                 }
                 else
                 {
-                    if(!previous.is_end_of_statement)
+                    if(!previous.is_end_of_statement && !previous.value == ' ')
                     {
                         if(previous_leaf_idx)
                         {

@@ -7,23 +7,34 @@
     "type": "LITERAL",
     "from_tokens": ["NUMBER", "STRING" , "BOOLEAN", "NULL"]
   },
-
+  {
+    "type": "SPECIALCHAR",
+    "from_tokens": ["IS", "SPACE" , "QUOTE", "DOUBLEQUOTE"]
+  },
   {
     "type": "IDENTIFIER",
     "token": "identifier"
   },
-
   {
     "type": "GROUP",
     "start": "(",
     "end": ")",
     "inner": "EXPRESSION"
   },
-
   {
     "type": "BINARY_EXPRESSION",
     "operators": ["+", "-", "*", "/", "==", "!=", ">", "<", ">=", "<="],
     "associativity": "left"
+  },
+  {
+    "type": "ASSIGNEMENT_EXPRESSION",
+    "operators": ["=", ":=", "+=", "-="],
+    "associativity": "left",
+    "args": {
+      "start": "let",
+      "end": ["NEWLINE","SEMICOLON"],
+      "delimiter": ","
+    }
   },
 
   {
