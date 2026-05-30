@@ -28,11 +28,11 @@
   },
   {
     "type": "ASSIGNMENT_EXPRESSION",
-    "operators": ["=", ":=", "+=", "-="],
     "args": {
       "start": "let",
       "end": ["NEWLINE","SEMICOLON","EOF"],
-      "delimiter": ","
+      "delimiter": ",",
+      "operators": ["=", ":=", "+=", "-="]
     }
   },
 

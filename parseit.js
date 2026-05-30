@@ -103,13 +103,12 @@ class ParseIt{
         const is_specialchar    =   specialchars.includes(type.toLowerCase())
         const is_end_of_statement       =   end_of_statements.includes(type.toLowerCase())
         const is_group          =   groups.find(group=>group.start===value)
-
+        let     matched                 = null
         if(is_operator || is_identifier){
 
             const   matching_start          =  helpers.expressions.filter(expression_ref=>{return expression_ref.hasOwnProperty('args') && expression_ref.args.start == value})
             const   matching_operators      =  helpers.expressions.filter(expression_ref=>(expression_ref.hasOwnProperty('operators') && expression_ref.operators.includes(value)))
             const   matching_expressions    =  matching_start.length ? matching_start : matching_operators
-            let     matched                 = null
             
             if(matching_expressions.length)
             {
@@ -136,7 +135,7 @@ class ParseIt{
             }
             token[2] = matched
         }
-        else
+        if(!matched || (!(is_operator || is_identifier)))
         {
             if(is_litteral)
             {
@@ -312,60 +311,77 @@ class ParseIt{
 
                 else if(type == "ASSIGNMENT_EXPRESSION")
                 {
-                    
-                    const {args,operators} = params
+                    // console.info('tooooookeeeeeen',current_token,current_pos,dataset)
+                    const {args} = params
                     const expression_start = args.start
                     const expression_end   = args.end.map(itm=>itm.toLowerCase())
-                    let   start_token_idx  = current_pos+1
+                    let   start_token_idx  = current_pos
                     let   end_token_idx    = null
-                    let   cursor           = start_token_idx
+                    let   cursor           = start_token_idx+1
                     let   test             = null
                     let   assignees        = []
                     let   assignments      = []
                     let   operator         = null
+                    let   operator_sign    = null
+                    let   operator_index   = null
+                    // console.info(end_token_idx)
+                    // console.info(args.operators)
                     while((cursor >= 0) && (cursor < dataset.length) && (end_token_idx == null))
                     {
                         const test            =   dataset[cursor]
-                        const value           =   (test.token[2] && test.token[2].toLowerCase) ? test.token[2].toLowerCase() : test.token[2]
-                        let is_operator       =   helpers.operators.hasOwnProperty(value)
-                        
-                        if(is_operator && operators.includes(value))
+                        const value           =   ((test.token[1] && test.token[1].value) ? test.token[1].value.toLowerCase() : test.token[1]).trim()
+                        if(expression_end.includes(value))
                         {
-                            operator = value
-                            cursor++
+                            end_token_idx = cursor
                         }
-                    
-                        end_token_idx = expression_end.includes(value) ? test.pos : null
-                        if(!end_token_idx)
+                        if(args.operators.includes(value))
                         {
-                            if(operator)
+                            operator       = helpers.operators[value]
+                            operator_sign  = value
+                            operator_index = cursor
+                        }
+                        cursor++
+                    }
+                    cursor           = start_token_idx+1
+                    while((cursor < end_token_idx))
+                    {
+                        const test            =   dataset[cursor]
+                        const type           =   (test.token[0].toLowerCase) ? test.token[0].toLowerCase() : test.token[0]
+                        const value           =   ((test.token[1] && test.token[1].value) ? test.token[1].value.toLowerCase() : test.token[1]).trim()
+                        if(operator == value)
+                        {
+                            cursor++
+                            continue
+                        }
+                        if(cursor > operator_index)
+                        {
+                            if((!(type == 'space')) && value.trim())
                             {
-                                assignments.push(dataset[cursor])
+                                assignments.push(test)
                             }
-                            else
+                        }
+                        if(cursor < operator_index)
+                        {
+                            if((!(type == 'space')) && value.trim())
                             {
-                                assignees.push(dataset[cursor])
+                                assignees.push(test)
                             }
-                            dataset[cursor]
                         }
                         cursor++
                     }
                     assignees   = this.ast_parse(assignees.map((item,idx)=>{item.pos=idx;return item}))
                     assignments = this.ast_parse(assignments.map((item,idx)=>{item.pos=idx;return item}))
-                    go_ahead = true
+                    go_ahead    = true
                     node = {
                         type,
-                        operator:params.operator,
-                        operator_sign:params.operator_sign,
-                        value:assignments,
+                        declaration_kind:params?params.value:dataset[start_token_idx][1],
+                        operator,
+                        operator_sign,
                         assignees,
                         assignments,
                         idx:current_pos,
-                        previous,
-                        next
                     }
-                    current_pos += end_token_idx+ - current_pos
-                    console.info(current_pos)
+                    current_pos += end_token_idx ? (end_token_idx - current_pos) : (dataset.length - current_pos)
                 }
                 else if(type == 'EOS')   
                 {
@@ -492,11 +508,12 @@ class ParseIt{
             operator: node.operator,
             is_end_of_statement: node.is_end_of_statement,
             is_specialchar: node.is_end_of_statement,
-            is_litteral: node.is_end_of_statement,
+            is_litteral: node.is_litteral,
             is_identifier: node.is_identifier,
             operator_sign: node.operator_sign,
             assignees: node.assignees,
             assignments: node.assignments,
+            declaration_kind: node.declaration_kind,
             value: node.value,
             idx: node.idx,
             left: null,
