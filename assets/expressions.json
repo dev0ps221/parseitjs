@@ -1,7 +1,7 @@
 [
   {
     "type": "EOS",
-    "from_tokens": ["NEWLINE","EOF"]
+    "from_tokens": ["NEWLINE","EOF","SEMICOLON"]
   },
   {
     "type": "LITERAL",

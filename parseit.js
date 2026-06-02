@@ -348,6 +348,7 @@ class ParseIt{
                         const test            =   dataset[cursor]
                         const type           =   (test.token[0].toLowerCase) ? test.token[0].toLowerCase() : test.token[0]
                         const value           =   ((test.token[1] && test.token[1].value) ? test.token[1].value.toLowerCase() : test.token[1]).trim()
+                        const params         = test.token && test.token.length >1 ? test.token[2] : {}
                         if(operator == value)
                         {
                             cursor++
@@ -358,6 +359,13 @@ class ParseIt{
                             if((!(type == 'space')) && value.trim())
                             {
                                 assignments.push(test)
+                            }
+                            else
+                            {
+                                if(end_of_statements.includes(type))
+                                {
+                                    break;
+                                }
                             }
                         }
                         if(cursor < operator_index)
