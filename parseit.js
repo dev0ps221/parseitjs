@@ -133,6 +133,10 @@ class ParseIt{
             {
                 matched.operator_sign = operator_sign
             }
+            else
+            {
+                // console.info('identifier unmatched in here',value,token)    
+            }
             token[2] = matched
         }
         if(!matched || (!(is_operator || is_identifier)))
@@ -314,7 +318,7 @@ class ParseIt{
                     // console.info('tooooookeeeeeen',current_token,current_pos,dataset)
                     const {args} = params
                     const expression_start = args.start
-                    const expression_end   = args.end.map(itm=>itm.toLowerCase())
+                    const expression_end   = [...args.end.map(itm=>itm.toLowerCase()),...end_of_statements]
                     let   start_token_idx  = current_pos
                     let   end_token_idx    = null
                     let   cursor           = start_token_idx+1
@@ -324,13 +328,15 @@ class ParseIt{
                     let   operator         = null
                     let   operator_sign    = null
                     let   operator_index   = null
+                    
                     // console.info(end_token_idx)
                     // console.info(args.operators)
                     while((cursor >= 0) && (cursor < dataset.length) && (end_token_idx == null))
                     {
                         const test            =   dataset[cursor]
+                        const type           =   ((test.token[0]) ? test.token[0].toLowerCase().trim() : '')
                         const value           =   ((test.token[1] && test.token[1].value) ? test.token[1].value.toLowerCase() : test.token[1]).trim()
-                        if(expression_end.includes(value))
+                        if(expression_end.includes(type))
                         {
                             end_token_idx = cursor
                         }
@@ -500,17 +506,20 @@ class ParseIt{
                 }
                 if(append)
                 {
+                    // console.info(node, 'being appended in here')
                     ast.push(node)
                 }
             }
             current_pos++
         }
+        // console.info(ast)
         const clean_ast = this.binary_factor(ast)
         return clean_ast
     }
     cleanAST(node) {
         if (!node || typeof node !== 'object') return node
 
+        this.already_cleaned[node.idx] = node
         const cleaned = {
             type: node.type,
             operator: node.operator,
@@ -527,17 +536,29 @@ class ParseIt{
             left: null,
             right: null
         }
-        if(cleaned.is_specialchar)
+        try
         {
-            cleaned['is_'+(node.type ? node.type : '').toLowerCase()] = node['is_'+(node.type ? node.type : '').toLowerCase()]
-        }
+            
+            if(cleaned.is_specialchar)
+            {
+                cleaned['is_'+(node.type ? node.type : '').toLowerCase()] = node['is_'+(node.type ? node.type : '').toLowerCase()]
+            }
+    
+            if(!(cleaned.is_end_of_statement))
+            {
+                if (node.left) {
+                    cleaned.left = (!this.already_cleaned.hasOwnProperty(node.left.idx)) ? this.cleanAST(node.left) : node.left
+                }
+        
+                if (node.right) {
+                    cleaned.right = (!this.already_cleaned.hasOwnProperty(node.right.idx)) ? this.cleanAST(node.right) : node.right
+                }
+            }
 
-        if (node.left) {
-            cleaned.left = this.cleanAST(node.left)
-        }
-
-        if (node.right) {
-            cleaned.right = this.cleanAST(node.right)
+        }    
+        catch(e)
+        {
+            // console.info('errors cleaning ast ',e, 'with node ',node)
         }
 
         return cleaned
@@ -546,7 +567,7 @@ class ParseIt{
     {
         const clean_ast = []
         const clean_ref = {}
-        ast.map((leaf,idx)=>{
+        ast.filter(item=>item.value!=' ').map((leaf,idx)=>{
             const   previous_idx    = idx > 0                   ? (idx - 1)             : null 
             const   next_idx        = (ast.length > (idx + 1))  ? (idx + 1)             : null 
             const   previous_leaf_idx   = clean_ref.hasOwnProperty(previous_idx) ? clean_ref[previous_idx] : null
@@ -682,6 +703,7 @@ class ParseIt{
             }
         })
         return clean_ast.map((ast_item)=>{
+            // console.info(ast_item,'in here')
             return this.cleanAST(ast_item)
         })
     }
@@ -723,6 +745,7 @@ class ParseIt{
     parse(args,use_input)
     {
 
+        this.already_cleaned = {}
         if(!use_input && (Array.isArray(args)))
         {
             use_input = this.tokenize_input(args)
